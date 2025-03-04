@@ -1,0 +1,28 @@
+---
+title: vLLM weird memory consumption
+author: mutkach
+---
+
+_Problem: You have downloaded and tested a new model from HF or any framework and now you need to run it elsewhere/ship it/deploy it. However the end result seem to be different and sometimes it's even completely wrong_
+
+Let's take for example Llama-3.2-11B-Visual. We'll pick TensorRT-LLM as our "production" backend. 
+
+I use it for simple Visual QA for some screenshots or web snapshots
+
+
+Butchering the LLM with 
+
+1. Register debug outputs
+2. Create debugging wrapper for HF blocks
+3. Write debug outputs to .pt files | Write HF outputs
+4. Compare outputs: plot and/or corrcoef. 
+5. Compare outputs of the same network but between layers
+6. Inject HF layer outputs manually
+
+
+
+
+
+
+
+
