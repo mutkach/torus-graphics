@@ -3,26 +3,182 @@ title: LLM surgery for debugging
 author: mutkach
 ---
 
-_Problem: You have downloaded and tested a new model from HF or any framework and now you need to run it elsewhere/ship it/deploy it. However the end result seem to be different and sometimes it's even completely wrong_
+_Problem: You have downloaded and tested a brand new LLM model from HF tested it - everything works great. Now you want to deploy it. End-to-end test result seem to be different or even completely wrong._
 
-Let's take for example Llama-3.2-11B-Visual. We'll pick TensorRT-LLM as our "production" backend. 
+I will show a certain method that I've been using for years for debugging neural networks of different kind while converting that between different formats.
+Let's take for example Llama-3.2-11B-Visual. We'll pick TensorRT-LLM as our "production" backend. It was all good until we reached a problem that virtually broke the solution of out business case: for some images llama would incorrectly parse some of the parts of the document. Neither vLLM nor `Huggingface` had that problem. 
 
-I use it for simple Visual QA for some screenshots or web snapshots
+For confidentiality reasons I'm not showing the precise inputs and images, but it is actually trivial to find troublesome corner-cases. 
+
+Let's say it was a web page snapshot with a VQ-like question about a certain number located on page. Two frameworks give similar answers notably differing with giving the correct answer. HF - does, `TRT-LLM` - does not.
+The prompt that was given to it was asking for the correct date of something that happened and was mentioned in the page, and the correct answer should have been, something like `"The date shown in the screenshot is 26.11.2024."` While what I got from TRT-LLM: `The date shown in the screenshot is November 1, 2023.`
+
+The plan for butchering the LLM is as follows: 
+
+1. First we check that tokenizer works the same way for both cases. 
+2. Fix manually any intermediate layer. Like fixing manually the visual encoder part, for example. Literally extracting the layer outputs from torch and transplanting it in the TRT-LLM pipeline.
+3. Register debug outputs with 
+4. Create debugging wrapper for HF blocks
+5. Write debug outputs to .pt files | Write HF outputs
+6. Compare outputs: plot and/or `corrcoef`. 
+7. Compare outputs of the same network but between layers
+8. After assessing the results pronounce the diagnosis
 
 
-Butchering the LLM with 
+Now that we see the differing outputs we would want to investigate the reasons. One of the possibilities here is to first localize the discrepancy. Of course LLM cannot be wrong _everywhere_. For that, I would recommend something called - comparative surgery. It is a universal method for all kinds of Neural Networks - not just LLM. 
 
-1. Register debug outputs
-2. Create debugging wrapper for HF blocks
-3. Write debug outputs to .pt files | Write HF outputs
-4. Compare outputs: plot and/or corrcoef. 
-5. Compare outputs of the same network but between layers
-6. Inject HF layer outputs manually
+Today we will examine the troublesome difference of inputs between those of TRT-LLM (former FasterTransformer) and Torch (@Huggingface) of a (relatively) fresh new multi-modal Llama - namely `meta-llama/Llama-3.2-11B-Vision-Instruct` 
 
+# Preparing (or _preparating_) the TRT-LLM
+We want to examine the output of each transformer block and save them somewhere. Given the architecture of the TensorRT and the TRT-LLM specifically - it is done by _registering_ the outputs first. Let's do just that. 
+Let's follow this guide: https://nvidia.github.io/TensorRT-LLM/reference/troubleshooting.html#debug-on-e2e-models. It's important to build it in debug mode such that it does not optimize out your outputs
 
-
+What we need to do is find `forward()` in the model description (located in `models/mllama/model.py`) and register the output just after the transformer block - this way will get 39 debug outputs - for one after each layer - which we would inspect at runtime later. I assume that you followed all the official instructions and are able to run the built engine with fixed inputs with no programmatical errors (also, remember, that temperature = 0 usually equals to reproducibility and determinate outputs).
 
 
+# Preparing the Torch model
+That is the easiest part. I'll show you how to instrument or hijack the forward method of the model. We will create a separate `util.py` which would contain a `torch.nn.Module` Wrapper class. In order to produce the corresponding forward wrapper we need to replicate the argument list of the original one. 
+By the way, there is one pretty cool tool that may come in handy when observing complicated `forward`'s:
+```python
+import inspect
+sig=inspect.signature(model.language_model.forward)
+```
+Which gives us the full signature with type hints!
+
+`<Signature (input_ids: torch.LongTensor = None, attention_mask: Optional[torch.Tensor] = None, position_ids: Optional[torch.LongTensor] = None, cross_attention_states: Optional[torch.LongTensor] = None, cross_attention_mask: Optional[torch.LongTensor] = None, full_text_row_masked_out_mask: Optional[Tuple[torch.Tensor, torch.Tensor]] = None,` ... and goes on. 
+
+Which is useful when the structure of the module is particularly complex or when looking at source code is not an option for some reason...
+
+So the wrapper of the transformer block goes something like this...:
+
+```python
+class DebugTransformerBlock:
+    """Wrapper class to add debugging to a transformer block"""
+    def __init__(self, block, layer_idx: int = 0, output_attentions=False):
+        self.block = block
+        self.layer_idx = layer_idx
+        self.debug_data = [] 
+        # we will store debugging information, 
+        # in case we needed something specific
+        self.output_attentions=output_attentions
+
+        # The important part
+        # Replace forward method with your version
+        block.forward = self.forward_with_debug       
+```
+
+Later we define:
+
+```python
+def forward_with_debug(
+    self, 
+    hidden_states,
+    cross_attention_mask,
+    ...
+    )
+  
+    outputs = self.original_forward(
+        hidden_states,
+        attention_mask=attention_mask,
+        cross_attention_mask=cross_attention_mask,
+        ...
+    )
+    step_n = len(self.debug_data)
+    self.debug_data.append({
+      'step': step_n,
+      'layer': self.layer_idx,
+      'output': outputs[0].detach().cpu()#.numpy(),
+    })
+    # save tensors for further examination
+    torch.save(outputs, f"./torch_debug_step{step_n}_{self.layer_idx}.pt")
+    self._print_debug_info(self.debug_data[-1])
+```
+
+And the actual patching is done like this:
+
+```python
+for layer_n in layers:
+    if hasattr(model, 'transformer'):
+        first_block = model.transformer.h[layer_n]
+    elif hasattr(model, 'model'):
+        first_block = model.model.layers[layer_n]
+    else:
+        raise ValueError("Could not locate transformer blocks in model")
+
+    # Add debugging
+
+    debug_wrapper = DebugTransformerBlock(first_block, layer_idx = layer_n, output_attentions = output_attentions)
+```
+
+# Running the input
+I used the `examples/multimodal/run.py`  provided by the TensorRT-LLM library for testing with default settings . When doing a debug run TRT-LLM kindly supplies a tllm_debug directory with is packed with pickled tensors that were registered on the previous steps. Running it will produce `N*M*2` files: `N` pairs of pickled layers with text representation for each of the `M` steps. Keep in mind that dimensionality of the zeroth step will be `P*dim` where P is the length of prompt in tokens.
 
 
+# Comparing the inputs
+This is the most interesting, or rather, the one and only substantial part of the post. We will now compare the outputs of the traced tensors. I will be using the following code utilizing  only `matplotlib` and focusing only on plotting the slices of embeddings (or rather - the hidden states) - token by token. I will also print the correlation coefficient to have a crude numerical measure of the discrepancy. 
 
+Let's start at **layer 0** and **step 0**.
+
+```python
+layer_idx = 0
+t = torch.load(f"torch_debug_{layer_idx}.pt", weights_only=True).to(torch.float16).cpu().numpy()[0]
+m = np.load(f"tllm_debug/PP_0/TP_0/CP_0/transformer.triton_debug_{layer_idx}-step0.npy")
+
+
+input_ids = inputs.input_ids[0]
+fig, axes = plt.subplots(3, 3, figsize=(10, 10))
+axes = axes.flatten()
+
+
+for i, ax in enumerate(axes):
+    
+    ax.set_title(f"{i} {tokenizer.decode(input_ids[i])} corr: {np.corrcoef([t[i], m[i]])[0][1].round(2)}")
+    ax.plot(t[i], color='red', alpha=0.9, lw=1.5)
+    ax.plot(m[i], alpha=0.9)
+    
+plt.tight_layout()
+plt.show()
+```
+Which gives us this nice output:
+
+![image00](../images/post1/layer0_ok.png)
+
+
+Now let's see what happens after the first cross-attention layer (3):
+![image2](../images/post1/layer3_ok.png)
+
+We may now visually observe the differences of hidden states that cannot be attributed to normalization (or de-normalization) and may further indicate that something is going wrong here. Notably it is indeed a case only in regards to the control tokens like `user` and `<end header>`.  Let's explore this further to decide whether it is only a minor numerical fluke or an actual bug. 
+For the last layer output (**layer 38**):
+
+![image3](../images/post1/layer38_ok.png)
+
+As expected the error propagates further. Also note the `corrcoef` drops to 0.7 which is the possible reason we get differing outputs in the end. 
+
+# Going further (but not deeper)
+
+It is also interesting to take a look what is gonna happen from this POV when we'll take different slices further along the generation process. 
+I'll slightly offset the the torch-slice to see that they are absolutely identical at 
+Now after the cross-attention layer (layer 3) we observe the same kind of "non-affine"-like discrepancy:!
+
+Now let's take one more step further to see that our different answer is not merely a decoding problem, it eventually culminates in the wrong answer - at the layer 0!
+![image_last](../images/post1/total.png)
+
+
+# Something weird
+Let's make a plot that show the delta between layers `N` and `N-1`. And we will see something peculiar. Exactly between layers 3 and 2, where we can observer that complete masking happens. Our control tokens are completely **masked out** for all blocks of cross-attention in `TRT-LLM` implementation. 
+Here's an (possibly not too confusing) image. 
+
+
+![image1111](../images/post1/diffs4.png)
+Green stands for TRT-LLM, Blue - for Torch. 
+Hereby, we conclude, that incorrect behavior had something to do with 
+1) cross-attention
+2) incorrect masking
+Is it enough to cause incorrect behavior downstream all the way to the incorrect answer? Possibly yes, but it's definitely worth further investigation.
+
+# Conclusion
+What did we hopefully learn today: 
+  - Did some TensorRT-LLM instrumentation
+  - Patched some Torch models littering it all with our probes 
+  - We applied these techniques for a problem "in the wild" - some minor malfunction of an LLM
+Keep in mind, that all these are merely an addition to reading the code thoroughly
