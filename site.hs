@@ -2,14 +2,22 @@
 {-# LANGUAGE OverloadedStrings #-}
 import           Data.Monoid (mappend)
 import           Hakyll
-
-
+import           Hakyll.Images        ( loadImage
+                                , compressJpgCompiler
+                                , scaleImageCompiler
+                                , resizeImageCompiler
+                                )
 --------------------------------------------------------------------------------
 main :: IO ()
 main = hakyll $ do
+
+    match "images/haskell-logo.png" $ do
+        route idRoute
+
     match "images/*" $ do
         route   idRoute
-        compile copyFileCompiler
+        compile $ loadImage
+                >>= resizeImageCompiler 120 120
 
     match "css/*" $ do
         route   idRoute
