@@ -13,9 +13,8 @@ For confidentiality reasons I'm not showing the precise inputs and images, but i
 
 Let's say it was a web page snapshot with a VQA-like question about a certain number located on page. Two frameworks gave similar answers notably regarding the answer of question. HF - does, `TRT-LLM` - does not.
 The prompt that was given to it was asking for the correct date of something that happened and was mentioned in the page, and the correct answer should have been, something like 
-
-* HF: `"The date shown in the screenshot is 26.11.2024."` 
-* TRT-LLM: `The date shown in the screenshot is November 1, 2023.`
+HF: `"The date shown in the screenshot is 26.11.2024."` 
+TRT-LLM: `The date shown in the screenshot is November 1, 2023.`
 
 For the intended use case it's not enough to merely respond with a grammatically and semantically correct way, I need to get the precise answer to my question. Now that we see the differing outputs we would want to investigate the reasons. One of the possibilities here is to first localize the discrepancy. Of course LLM cannot be wrong _everywhere_. For that, I would recommend something called - `comparative surgery`. It is a universal method for all kinds of Neural Networks - not just LLM. In short, it means that we extract meaningful parts of intermediate layers (one - from a healthy specimen and the faulty one), then compare them one to one.
 
