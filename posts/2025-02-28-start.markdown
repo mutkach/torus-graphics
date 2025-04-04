@@ -119,7 +119,7 @@ Let's start at **layer 0** and **step 0**.
 
 ```python
 layer_idx = 0
-t = torch.load(f"torch_debug_{layer_idx}.pt", weights_only=True).to(torch.float16).cpu().numpy()[0]
+t = torch.load(f"torch_debug_{layer_idx}.pt", weights_only=True).cpu().numpy()[0]
 m = np.load(f"tllm_debug/PP_0/TP_0/CP_0/transformer.triton_debug_{layer_idx}-step0.npy")
 
 
