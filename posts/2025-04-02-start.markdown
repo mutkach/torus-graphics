@@ -139,17 +139,14 @@ plt.show()
 ```
 Which gives us this nice output:
 
-![image00](../images/layer0_ok.png)
-
+![image00](../images/layer0_ok.png){.small}
 As you can see both frameworks have the same hidden states for each token.
 Now let's see what happens after the first cross-attention layer (3):
-![image2](../images/layer3_ok.png)
-
+![image2](../images/layer3_ok.png){.small}
 We may now visually observe the differences of hidden states that cannot be attributed to normalization (or de-normalization) and may further indicate that something is going wrong here. Notably it is indeed a case only in regards to the control tokens like `user` and `<end header>`.  Let's explore this further to decide whether it is only a minor numerical fluke or an actual bug. 
 For the last layer output (**layer 38**):
 
-![image3](../images/layer38_ok.png)
-
+![image3](../images/layer38_ok.png){.small}
 As expected the error propagates further. Also note the `corrcoef` drops to 0.7 which is the possible reason we get differing outputs in the end. 
 
 # Going further (but not deeper)
@@ -159,16 +156,13 @@ I'll slightly offset the the torch-slice to see that they are absolutely identic
 Now after the cross-attention layer (layer 3) we observe the same kind of "non-affine"-like discrepancy:!
 
 Now let's take one more step further to see that our different answer is not merely a decoding problem, it eventually culminates in the wrong answer - at the layer 0!
-![image_last](../images/total.png)
-
-
+![image_last](../images/total.png){.small}
 # Something weird
 Let's make a plot that shows the delta between layers `N` and `N-1`. And we will see something peculiar. Exactly between layers 3 and 2, where we can observer that complete masking happens. Our control tokens are completely **masked out** for all blocks of cross-attention in `TRT-LLM` implementation. 
 Here's an (possibly not too confusing) image. 
 
 
-![image1111](../images/diffs4.png)
-
+![image1111](../images/diffs4.png){.small}
 **Green** stands for TRT-LLM, **Blue** - for Torch. 
 
 Hereby, we conclude, that incorrect behavior had something to do with 
