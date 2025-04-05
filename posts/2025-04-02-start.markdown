@@ -162,7 +162,8 @@ Let's make a plot that shows the delta between layers `N` and `N-1`. And we will
 Here's an (possibly not too confusing) image. 
 
 
-![image1111](../images/diffs4.png){.small}
+![image1111](../images/diffs4.png)
+
 **Green** stands for TRT-LLM, **Blue** - for Torch. 
 
 Hereby, we conclude, that incorrect behavior had something to do with 
