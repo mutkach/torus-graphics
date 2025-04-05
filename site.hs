@@ -17,7 +17,7 @@ main = hakyll $ do
     match "images/*" $ do
         route   idRoute
         compile $ loadImage
-                >>= resizeImageCompiler 120 120
+                >>= scaleImageCompiler 120 120
 
     match "css/*" $ do
         route   idRoute
