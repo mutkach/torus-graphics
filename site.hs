@@ -40,7 +40,7 @@ main = hakyll $ do
     match "images/*" $ do
         route   idRoute
         compile $ loadImage
-                >>= scaleImageCompiler 800 640 
+                >>= scaleImageCompiler 1024 800
 
     create ["css/syntax.css"] $ do
       route idRoute
@@ -64,6 +64,15 @@ main = hakyll $ do
          trace "FUCK YOU" $ return ()
          myPandocCompiler'
             >>= loadAndApplyTemplate "templates/post.html"    postCtx
+            >>= loadAndApplyTemplate "templates/default.html" postCtx
+            >>= relativizeUrls
+
+    match "projects/*" $ do
+        route $ setExtension "html"
+        compile $ do
+         trace "FUCK YOU" $ return ()
+         myPandocCompiler'
+            >>= loadAndApplyTemplate "templates/project.html"    postCtx
             >>= loadAndApplyTemplate "templates/default.html" postCtx
             >>= relativizeUrls
 

@@ -1,5 +1,5 @@
 ---
-title: LLM surgery for debugging 
+title: LLM surgery for debugging [Part 1]
 author: mutkach
 ---
 
@@ -247,26 +247,28 @@ Now let's take one more step further to see that our different answer is not mer
 ![image_last](../images/image4.png)
 
 # Something is weird
-Let's make a plot that shows the delta between layers `N` and `N-1`. And we will see something peculiar. Exactly between layers 3 and 2, where we can observer that complete masking happens. Our control tokens are completely **masked out** for all blocks in cross-attention in `TRT-LLM` implementation. 
+Let's make a plot that shows the delta between layers `N` and `N-1`. And we will see something peculiar. Exactly between layers 3 and 2, where we can observe that complete masking happens. Our control tokens are completely **masked out** for all blocks in cross-attention in `TRT-LLM` implementation. 
 Here's an (possibly not too confusing) image. 
 
 
 
 
-![masked tokens](../images/diffs4.png)
+![masked tokens](../images/image5.png)
 
 
 
-**Green** stands for TRT-LLM, **Blue** - for Torch. 
+**Green** stands for `TRT-LLM`, **Blue** - for `Torch`. 
+
+What that means is that there an cross-attention mask incorrectly applied in TRT-LLM
 
 Hereby, we conclude, that incorrect behavior had something to do with 
 1) cross-attention
 2) incorrect masking
-Is it enough to cause incorrect behavior downstream all the way to the incorrect answer? Possibly no, but it's definitely worth further investigation. 
+Is it enough to cause incorrect behavior downstream all the way to the incorrect answer? Possibly no, but it's definitely worth further investigation. And that's the only
 
 # Conclusion
-What did we hopefully learn today: 
-  - Did some TensorRT-LLM instrumentation
-  - Patched some Torch models littering it all with our probes 
+What did we learn today: 
+  - How to do some TensorRT-LLM instrumentation
+  - Patched some Torch models littering them all with our probes 
   - We applied these techniques for a problem "in the wild" - some minor malfunction of an LLM
 Keep in mind, that all these are merely an addition to reading the code thoroughly
