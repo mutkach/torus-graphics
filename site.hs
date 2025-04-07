@@ -40,8 +40,8 @@ main = hakyll $ do
     match "images/*" $ do
         route   idRoute
         compile $ loadImage
-                >>= resizeImageCompiler 480 320
-                >>= scaleImageCompiler 480 320
+                >>= resizeImageCompiler 640 640 
+                >>= scaleImageCompiler 640 640 
 
     create ["css/syntax.css"] $ do
       route idRoute
