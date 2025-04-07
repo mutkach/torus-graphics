@@ -12,7 +12,7 @@ import Hakyll.Images
   )
 
 import Hakyll.Web.Pandoc (defaultHakyllWriterOptions)
-import Text.Pandoc.Highlighting (Style, breezeDark, styleToCss)
+import Text.Pandoc.Highlighting (Style, breezeDark, styleToCss, tango, espresso, pygments, zenburn)
 import Text.Pandoc.Options (ReaderOptions (..), WriterOptions (..))
 
 --------------------------------------------------------------------------------
