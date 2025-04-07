@@ -14,8 +14,8 @@ For confidentiality reasons I'm not showing the precise inputs and images, but i
 Let's say it was a web page snapshot with a VQA-like question about a certain number located on page. Two frameworks gave similar answers notably regarding the answer of question. HF - does, `TRT-LLM` - does not.
 The prompt that was given to it was asking for the correct date of something that happened and was mentioned in the page, and the correct answer should have been, something like 
 
-- **Huggingface**: `"The date shown in the screenshot is 26.11.2024."` 
-- **TRT-LLM:** `The date shown in the screenshot is November 1, 2023.`
+* **Huggingface**: `"The date shown in the screenshot is 26.11.2024."` 
+* **TRT-LLM:** `The date shown in the screenshot is November 1, 2023.`
 
 For the intended use case it's not enough to merely respond with a grammatically and semantically correct way, I need to get the precise answer to my question. Now that we see the differing outputs we would want to investigate the reasons. One of the possibilities here is to first localize the discrepancy. Of course LLM cannot be wrong _everywhere_. For that, I would recommend something called - `comparative surgery`. It is a universal method for all kinds of Neural Networks - not just LLM. In short, it means that we extract meaningful parts of intermediate layers (one - from a healthy specimen and the faulty one), then compare them one to one.
 
@@ -158,8 +158,6 @@ def forward_with_debug(
 
 And the actual patching is done like this:
 
-
-
 ```python
 for layer_n in layers:
     if hasattr(model, 'transformer'):
@@ -175,8 +173,6 @@ for layer_n in layers:
 
 # Running the input
 I used the `examples/multimodal/run.py`  provided by the TensorRT-LLM library for testing with default settings and `debug_mode` turned on. In my case it didn't work though, because the `debug_mode` argument did not pass correctly over to the runner itself, so I hardcoded it to `True` int runner. 
-
-
 
 ```bash
 python3 tensorrtllm_backend/tensorrt_llm/examples/multimodal/run.py 
@@ -195,7 +191,7 @@ I assume that you followed all the official instructions and are able to run the
 When doing a debug run TRT-LLM kindly supplies a tllm_debug directory packed  with pickled tensors that we've registered during the previous steps. Running the prompt will produce `N*M*2` files: `N` pairs of pickled layers with text representation for each of the `M` steps. Keep in mind that the dimensionality of the zeroth step will be `P*dim` where P is the length of prompt in tokens. `2` - stands for both `.txt` and `.npy`
 
 
-# Comparing the inputs
+# Comparing the outputs
 This is the most interesting, or rather, the one and only substantial part of the post. We will now compare the outputs of the traced tensors. I will be using the following code utilizing  only `matplotlib` and focusing only on plotting the slices of embeddings (or rather - the hidden states) - token by token. I will also print the correlation coefficient to have a crude numerical measure of the discrepancy. 
 
 Let's start at **layer 0** and **step 0**.
@@ -224,19 +220,19 @@ Which gives us this nice output:
 
 
 
-![image00](../images/layer0_ok.png){.small}
+![image00](../images/image1.png){.small}
 
 As you can see both frameworks have the same hidden states for each token.
 Now let's see what happens after the first cross-attention **layer_idx = 3**:
 
-![image2](../images/layer3_ok.png){.small}
+![after crossatt](../images/image2.png){.small}
 
-We may now visually observe the differences of hidden states that cannot be attributed to normalization (or de-normalization) and may further indicate that something is going wrong here. Notably it is indeed a case only in regards to the control tokens like `user` and `<end header>`.  Let's explore this further to decide whether it is only a minor numerical fluke or an actual bug. 
+We may now visually observe the differences of hidden states that cannot be attributed to normalization (or de-normalization) and may further indicate that something is going wrong here. Notably it is indeed a case only in regards to the control tokens like `user` and `<end header_id>`.  Let's explore this further to decide whether it is only a minor numerical fluke or an actual bug. 
 For the last layer output (**layer 38**):
 
 
 
-![image3](../images/layer38_ok.png){.small}
+![image3](../images/image3.png){.small}
 
 As expected the error propagates further. Also note the `corrcoef` drops to 0.7 which is the possible reason we get differing outputs in the end. 
 
@@ -248,7 +244,7 @@ Now after the cross-attention layer (layer 3) we observe the same kind of "non-a
 
 Now let's take one more step further to see that our different answer is not merely a decoding problem, it eventually culminates in the wrong answer - at the layer 0!
 
-![image_last](../images/total.png)
+![image_last](../images/image4.png)
 
 # Something is weird
 Let's make a plot that shows the delta between layers `N` and `N-1`. And we will see something peculiar. Exactly between layers 3 and 2, where we can observer that complete masking happens. Our control tokens are completely **masked out** for all blocks in cross-attention in `TRT-LLM` implementation. 
@@ -257,7 +253,7 @@ Here's an (possibly not too confusing) image.
 
 
 
-![image1111](../images/diffs4.png)
+![masked tokens](../images/diffs4.png)
 
 
 
