@@ -156,7 +156,7 @@ I'll slightly offset the the torch-slice to see that they are absolutely identic
 Now after the cross-attention layer (layer 3) we observe the same kind of "non-affine"-like discrepancy:!
 
 Now let's take one more step further to see that our different answer is not merely a decoding problem, it eventually culminates in the wrong answer - at the layer 0!
-![image_last](../images/total.png){.small}
+![image_last](../images/total.png){.l
 # Something weird
 Let's make a plot that shows the delta between layers `N` and `N-1`. And we will see something peculiar. Exactly between layers 3 and 2, where we can observer that complete masking happens. Our control tokens are completely **masked out** for all blocks of cross-attention in `TRT-LLM` implementation. 
 Here's an (possibly not too confusing) image. 

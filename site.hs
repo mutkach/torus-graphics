@@ -1,17 +1,40 @@
 --------------------------------------------------------------------------------
 {-# LANGUAGE OverloadedStrings #-}
-import           Data.Monoid (mappend)
-import           Hakyll
-import           Hakyll.Images        ( loadImage
-                                , compressJpgCompiler
-                                , scaleImageCompiler
-                                , resizeImageCompiler
-                                )
+import Data.Monoid (mappend)
+import Debug.Trace
+import Hakyll
+
+import Hakyll.Images
+  ( compressJpgCompiler,
+    loadImage,
+    resizeImageCompiler,
+    scaleImageCompiler,
+  )
+
+import Hakyll.Web.Pandoc (defaultHakyllWriterOptions)
+import Text.Pandoc.Highlighting (Style, breezeDark, styleToCss)
+import Text.Pandoc.Options (ReaderOptions (..), WriterOptions (..))
+
 --------------------------------------------------------------------------------
+
+pandocCodeStyle :: Style
+pandocCodeStyle = breezeDark
+
+
+myPandocCompiler' :: Compiler (Item String)
+myPandocCompiler' =
+  pandocCompilerWith
+    defaultHakyllReaderOptions
+    defaultHakyllWriterOptions
+      { writerHighlightStyle   = Just pandocCodeStyle
+        ,writerNumberSections = True
+      }
+
 main :: IO ()
 main = hakyll $ do
 
     match "images/haskell-logo.png" $ do
+        pure $ trace "fuck you1" 
         route idRoute
 
     match "images/*" $ do
@@ -19,19 +42,27 @@ main = hakyll $ do
         compile $ loadImage
                 >>= scaleImageCompiler 120 120
 
+    create ["css/syntax.css"] $ do
+      route idRoute
+      compile $ do
+        trace "fuck you" 
+        >> makeItem $ styleToCss pandocCodeStyle
+
     match "css/*" $ do
         route   idRoute
         compile compressCssCompiler
 
     match (fromList ["about.rst", "contact.markdown"]) $ do
         route   $ setExtension "html"
-        compile $ pandocCompiler
+        compile $ myPandocCompiler'
             >>= loadAndApplyTemplate "templates/default.html" defaultContext
             >>= relativizeUrls
 
     match "posts/*" $ do
         route $ setExtension "html"
-        compile $ pandocCompiler
+        compile $ do
+         trace "FUCK YOU" $ return ()
+         myPandocCompiler'
             >>= loadAndApplyTemplate "templates/post.html"    postCtx
             >>= loadAndApplyTemplate "templates/default.html" postCtx
             >>= relativizeUrls
@@ -54,6 +85,7 @@ main = hakyll $ do
     match "index.html" $ do
         route idRoute
         compile $ do
+            pure $ trace "fuck you"
             posts <- recentFirst =<< loadAll "posts/*"
             let indexCtx =
                     listField "posts" postCtx (return posts) `mappend`
@@ -65,6 +97,8 @@ main = hakyll $ do
                 >>= relativizeUrls
 
     match "templates/*" $ compile templateBodyCompiler
+
+
 
 
 --------------------------------------------------------------------------------

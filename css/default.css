@@ -1,12 +1,10 @@
-@import kate;
-
 html {
-  font-size: 60.0%;
+  font-size: 62.5%;
 }
 
 body {
   font-size: 1.6rem;
-  color: #111;
+  color: #000;
 }
 
 header {
@@ -16,7 +14,6 @@ header {
 nav {
   text-align: right;
 }
-
 
 nav a {
   font-size: 1.8rem;
@@ -35,7 +32,7 @@ footer {
 }
 
 h1 {
-  font-size: 3rem;
+  font-size: 2.4rem;
 }
 
 h2 {
@@ -54,9 +51,9 @@ article .header {
   text-decoration: none;
 }
 
-@media (max-width: 320px) {
+@media (max-width: 319px) {
   body {
-    width: 50%;
+    width: 90%;
     margin: 0;
     padding: 0 5%;
   }
@@ -83,7 +80,7 @@ article .header {
   }
 }
 
-@media (max-width: 320px) {
+@media (min-width: 320px) {
   body {
     width: 90%;
     margin: 0;
@@ -112,7 +109,7 @@ article .header {
   }
 }
 
-@media (max-width: 320px) {
+@media (min-width: 640px) {
   body {
     width: 60rem;
     margin: 0 auto;
