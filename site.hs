@@ -34,18 +34,18 @@ main :: IO ()
 main = hakyll $ do
 
     match "images/haskell-logo.png" $ do
-        pure $ trace "fuck you1" 
+        trace "fuck you1" $ return ()
         route idRoute
 
     match "images/*" $ do
         route   idRoute
         compile $ loadImage
-                >>= scaleImageCompiler 120 120
+                >>= scaleImageCompiler 480 320
 
     create ["css/syntax.css"] $ do
       route idRoute
       compile $ do
-        trace "fuck you" 
+        trace "fuck you" $ return ()
         >> makeItem $ styleToCss pandocCodeStyle
 
     match "css/*" $ do
