@@ -246,11 +246,8 @@ Now let's take one more step further to see that our different answer is not mer
 
 ![fig. 4](../images/image4.png)
 
-# Something is weird
-Let's make a plot that shows the delta between layers `N` and `N-1`. And we will see something peculiar. Exactly between layers 3 and 2, where we can observe that complete masking happens. Our control tokens are completely **masked out** for all blocks in cross-attention in `TRT-LLM` implementation. 
-Here's an (possibly not too confusing) image. 
-
-
+# Something is wrong
+Let's make a plot that shows the delta between layers `N` and `N-1`. And then we will see something peculiar. Specifically we are plotting the change of the hidden state between layers 3 and 2. Layer 3 is the first of the cross-attention blocks and weirdly it does not affect the hidden state. It seems that our control tokens are completely **masked out** for all blocks in cross-attention in `TRT-LLM` implementation. Interestingly it is not the case for the Huggingface implementation.
 
 
 ![fig. 5](../images/image5.png)
@@ -261,7 +258,7 @@ Here's an (possibly not too confusing) image.
 
 What that means is that there an cross-attention mask incorrectly applied in TRT-LLM
 
-Hereby, we conclude, that incorrect behavior had something to do with:
+Hereby, we conclude, that incorrect behavior has something to do with:
 
 1) cross-attention
 2) incorrect masking
@@ -271,7 +268,11 @@ Is it enough of to cause incorrect behavior all the way downstream to the incorr
 # Conclusion
 What did we learn today: 
 
-* How to do some TensorRT-LLM instrumentation
-* Patched some Torch models littering them all with our probes 
+* How to do some TensorRT-LLM instrumentation.
+* How to inject models with littering them all over with our probing functions.
+* Easily compare two vectors visually by plotting them and overlaying over each other.
 * We applied these techniques for a problem "in the wild" - some malfunction in a new LLM.
-  Keep in mind, that all these are merely an addition to reading the code thoroughly
+
+Keep in mind, that all these are merely an addition to reading the code diligently.
+
+In the next episode we will check if Nvidia patched their implementation and also it would be nice to extract attention masks and make some further observations.

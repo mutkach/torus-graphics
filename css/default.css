@@ -1,22 +1,31 @@
 html {
-  font-size: 60.0%;
+  font-size: 70.0%;
 }
 
 body {
   font-family: "PT Serif";
-  font-size: 1.5rem;
+  font-size: 1.3rem;
   color: #000;
+  text-align: left;
 }
 
 header {
-  border-bottom: 0.2rem solid #000;
+  border-bottom: 0.2rem solid #005;
 }
 
-img {
+fig {
+  display: inline;
+  margin-left: auto;
+  margin-right: 300rem;
+}
+
+figcaption {
+  text-align: center;
   display: block;
   margin-left: auto;
   margin-right: auto;
 }
+
 code {
   font-family: "IBM Plex Mono", Consolas, Monaco, "Andale Mono", monospace;
   font-size: 0.85em; /* Makes the font 85% of the parent font size */
@@ -27,9 +36,10 @@ pre code {
   font-family: "IBM Plex Mono", Consolas, Monaco, "Andale Mono", monospace;
   font-size: 0.85em;
   display: block;
-  padding: 1em;
+  padding: 2em;
   overflow: auto;
 }
+
 nav {
   text-align: right;
 }
@@ -72,9 +82,9 @@ article .header {
 
 @media (max-width: 319px) {
   body {
-    width: 90%;
+    width: 100%;
     margin: 0;
-    padding: 0 5%;
+    padding: 0 0%;
   }
   header {
     margin: 4.2rem 0;
@@ -99,7 +109,7 @@ article .header {
   }
 }
 
-@media (min-width: 320px) {
+@media (max-width: 320px) {
   body {
     width: 90%;
     margin: 0;
@@ -130,12 +140,12 @@ article .header {
 
 @media (min-width: 640px) {
   body {
-    width: 60rem;
-    margin: 0 auto;
+    width: 70rem;
+    margin: 0 5%;
     padding: 0;
   }
   header {
-    margin: 0 0 3rem;
+    margin: 0 0 0rem;
     padding: 1.2rem 0;
   }
   nav {
@@ -143,7 +153,7 @@ article .header {
     text-align: right;
   }
   nav a {
-    margin: 0 0 0 1.2rem;
+    margin: 0 0 0 0rem;
     display: inline;
   }
   footer {
