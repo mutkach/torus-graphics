@@ -3,44 +3,43 @@ title: LLM surgery for debugging [Part 1]
 author: mutkach
 ---
 
-_Problem: You have downloaded and tested a brand new LLM model from HF. You test it - everything works great for a couple of examples. Now you want to deploy it and the end-to-end test result seems to be different or even completely wrong._
+_Problem: You downloaded and tested a new LLM model from HF. You test it - everything works great for the first couple of examples. Now, you want to deploy it to a production-ready framework (triton, tfserving, torchserve, vllm, trt-llm, etc.), and the end-to-end test result seems to be different or even plain out wrong._
 
-I will show you a certain method that I've been using for years for debugging neural networks of different kinds. Specifically it helps a lot while converting models between different formats and runtimes.
-Let's take for example `Llama-3.2-11B-Vision-Instruct`.
-We'll pick TensorRT-LLM as our "production" backend which is expected to serve the requests, while testing is done using good ol' `Huggingface`. It was all good until I reached a problem that virtually broke the of out business case: for some images llama would incorrectly parse some of the parts of the document. Neither vLLM nor `Huggingface` had that problem. 
+I will show you a specific method that I've been using for years for debugging neural networks of different kinds. Specifically, it helps a lot while converting models between different formats and runtimes. Let's take, for example, `+Llama-3.2-11B-Vision-Instruct+`. We'll pick TensorRT-LLM as our "`production`" backend that is expected to serve the requests, while testing is done using good ol' `+Huggingface+`. It was all good until I reached a problem that virtually broke the of out business case: for some images, llama would incorrectly parse some of the parts of the document. Neither vLLM nor `+Huggingface+` had that problem.
 
-For confidentiality reasons I'm not showing the precise inputs and images, but it is actually trivial to find some troublesome corner-cases. 
-
-Let's say it was a web page snapshot with a VQA-like question about a certain number located on page. Two frameworks gave similar answers notably regarding the answer of question. HF - does, `TRT-LLM` - does not.
+Let's say it was a web page snapshot with a VQA-like question about a specific number located on the page. Two frameworks gave similar answers, notably regarding the answer to the question. HF - does, `+TRT-LLM+` - does not.
 
 ![example that cannot be parsed correctly](../images/image20.jpg)
 
-The prompt that was given to it was asking for the correct date of something that happened and was mentioned in the page, and the correct answer should have been, something like 
+The prompt that was given to it was asking for the correct date of something that happened and was mentioned in the page, and the correct the answer should have been something like
 
 * **Huggingface**: `"The date shown in the screenshot is 26.11.2024."` 
 * **TRT-LLM:** `"The date shown in the screenshot is November 1, 2023."`
 
-For the intended use case it's not enough to merely respond with a grammatically and semantically correct way, I need to get the precise answer to my question. Now that we see the differing outputs we would want to investigate the reasons. One of the possibilities here is to first localize the discrepancy. Of course LLM cannot be wrong _everywhere_. For that, I would recommend something called - let's call it - `comparative LLM surgery`. It is a universal method for all kinds of Neural Networks - not just LLMs. In short, it means that we extract meaningful parts of intermediate layers (one - from a healthy specimen and the faulty one), then compare them one to one.
+For the intended use case, it's not enough to merely respond in a grammatically and semantically correct way; I need to get the precise answer to my question. Now that we see the differing outputs, we want to investigate the reasons. One of the possibilities here is to localize the discrepancy first. Of course, two LLM frameworks cannot be incorrect _everywhere_. For that, I would recommend  - let's call it - `+comparative LLM surgery+`. It is a universal method for all kinds of neural networks - not just LLMs. In short, it means we extract meaningful parts of intermediate layers (one - from a healthy specimen and the faulty one), and then compare them one to one.
 
 The plan for diagnosing the LLM is as follows: 
 
-1. First we check that tokenizer works the same way for both cases. 
-2. Fix manually any intermediate layer. I.e. fixing manually the visual encoder part, for example. Literally extracting the layer outputs from torch and transplanting it in the TRT-LLM pipeline.
+1. First, we check that the tokenizer works the same way for both cases.
+2. Fix manually any intermediate layer. I.e., fixing manually the visual
+   encoder part, for example. Literally extracting the layer outputs from
+   Torch and injecting it in the TRT-LLM pipeline.
 3. Register debug outputs within TensorRT
 4. Create debugging wrapper for HF transformer blocks
-5. Write debug outputs to .pt files | Write HF outputs to wherever you want them
-6. Compare shapes, compare distribution and/or compute `corrcoef`. 
+5. Write debugging outputs to .pt files | Write HF outputs to wherever you
+   want them
+6. Compare shapes, compare distribution, and/or compute `+corrcoef+`
 7. Compare outputs: plot the hidden state
-8. Compare outputs' difference between layers (in case some them are passed through)
+8. Compare outputs' difference between layers (in case some of them are
+    skipped)
 9. After assessing the results, pronounce the diagnosis
 
-Today we will examine the troublesome difference of inputs between those of TRT-LLM (former FasterTransformer) and Torch (and Huggingface) of a relatively new multi-modal Llama - namely `meta-llama/Llama-3.2-11B-Vision-Instruct` 
+Today we will examine the troublesome difference of outputs between those of TRT-LLM (former FasterTransformer) and Torch (and Huggingface) of a relatively new multi-modal Llama - namely `meta-llama/Llama-3.2-11B-Vision-Instruct` 
 
 # Preparing (or _preparating_) the TRT-LLM
-Llama-11b-Vision consists of 39 transformer blocks. We want to mark the output of each transformer block and save them somewhere. TensorRT and the TRT-LLM specifically - are very optimization intensive it is done by _registering_ the outputs first. Let's do just that. 
-Let's follow this [guide](https://nvidia.github.io/TensorRT-LLM/reference/troubleshooting.html#debug-on-e2e-models)
+`Llama-11B-Vision` consists of 39 transformer blocks. We want to mark the output of each transformer block and save them somewhere. TensorRT and the TRT-LLM specifically - are very optimization intensive it is done by _registering_ the outputs first. Let's do just that. Let's follow this [guide](https://nvidia.github.io/TensorRT-LLM/reference/troubleshooting.html#debug-on-e2e-models)
 
-It's important to build the model in debug mode such that it does not optimize out your outputs:
+It's essential to build the model in debug mode such that it does not optimize out your outputs:
 
 ```bash
 trtllm-build
@@ -51,8 +50,6 @@ trtllm-build
  --max_seq_len 2048 
  --max_encoder_input_len 6404 
 ```
-
-
 
 I'll cite the [manual](https://nvidia.github.io/TensorRT-LLM/reference/troubleshooting.html#debug-on-e2e-models) here:
 
@@ -97,8 +94,8 @@ for i, (decoder_layer, past) in enumerate(
 
 
 # Preparing the Torch model
-That is the easier part. I'll show you how to instrument or hijack the forward method of the model. We will create a separate `util.py` which would contain a `torch.nn.Module` Wrapper class. In order to produce the corresponding forward wrapper we need to replicate the argument list of the original one. 
-By the way, there is one pretty cool tool that may come in handy when observing complicated `forward`'s. It gives us the full signature with type hints!
+That is the easier part. I'll show you how to instrument or hijack the
+forward method of the model. We will create a separate `+util.py+` containing a `+torch.nn.Module+` Wrapper class. In order to produce the corresponding forward wrapper, we need to replicate the original argument list. By the way, one pretty cool tool may come in handy when observing complicated `+forward+`’s. It gives us the full signature with type hints!
 
 
 
@@ -112,7 +109,7 @@ print(sig)
 Signature (input_ids: torch.LongTensor = None, attention_mask: Optional[torch.Tensor] = None, position_ids: Optional[torch.LongTensor] = None, cross_attention_states: Optional[torch.LongTensor] = None, cross_attention_mask: Optional[torch.LongTensor] = None, full_text_row_masked_out_mask: Optional[Tuple[torch.Tensor, torch.Tensor]] = None, ...
 """
 ```
-This output is useful when the structure of the module is particularly complex or when looking at source code is not an option for some reason...
+This output is of particular benefit when the structure of the module is significantly complex or when looking at source code is not an option for some reason…
 
 So the wrapper of the transformer block looks something like this:
 
@@ -131,8 +128,6 @@ class DebugTransformerBlock:
 ```
 
 Later we define:
-
-
 
 ```python
 def forward_with_debug(
@@ -195,7 +190,7 @@ When doing a debug run TRT-LLM kindly supplies a tllm_debug directory packed  wi
 
 
 # Comparing the outputs
-This is the most interesting, or rather, the one and only substantial part of the post. We will now compare the outputs of the traced tensors. I will be using the following code utilizing  only `matplotlib` and focusing only on plotting the slices of embeddings (or rather - the hidden states) - token by token. I will also print the correlation coefficient to have a crude numerical measure of the discrepancy. 
+This is the most interesting, or rather, the one and only substantial part of the post. We will now compare the outputs of the traced tensors. I will be using the following code utilizing only `+matplotlib+` and focusing only on plotting the slices of embeddings (or rather - the hidden states) - token by token. I will also print the correlation coefficient to have a crude numerical measure of the discrepancy.
 
 Let's start at **layer 0** and **step 0**.
 
@@ -221,21 +216,17 @@ plt.show()
 ```
 Which gives us this nice output:
 
-
-
 <a href="/images/image1.png" target="_blank">
   <img src="/images/image1.png" alt="Description of image">
 </a>
 
-As you can see both frameworks have the same hidden states for each token.
-Now let's see what happens after the first cross-attention **layer_idx = 3**:
+As you can see both frameworks have the same hidden states for each token. Now let's see what happens after the first cross-attention **layer_idx = 3**:
 
 <a href="/images/image2.png" target="_blank">
   <img src="/images/image2.png" alt="Description of image">
 </a>
 
-We may now visually observe the differences of hidden states that cannot be attributed to just a rescaling or varying precision (and it is not the case, both frameworks use `bfloat16`) and may further indicate that something is going wrong here. Notably it is indeed a case only in regards to the control tokens like `user` and `<end header_id>`.  Let's explore this further to decide whether it is only a minor numerical fluke or an actual bug. 
-For the last layer output (**layer 38**):
+We may now visually observe the differences of hidden states that cannot be attributed to just a rescaling or varying precision (and it is not the case. Both frameworks use `+bfloat16+`) and may further indicate that something is going wrong here. Notably, it is indeed a case only regarding the control tokens like `+user+` and `+<end header_id>+`. Let's explore this further to decide whether it is only a minor numerical fluke or an actual bug. For the last layer output (**layer 38**):
 
 
 
@@ -243,13 +234,11 @@ For the last layer output (**layer 38**):
   <img src="/images/image3.png" alt="Description of image">
 </a>
 
-As expected the error propagates further. Also note the `corrcoef` that I use to measure discrepancy between hidden states drops to 0.7 which is the possible reason we get differing outputs in the end. 
+As expected, the error propagates further. Also, note the `corrcoef` that I use to measure discrepancy between hidden states drops to 0.7 which is the possible reason we get differing outputs in the end. 
 
 # Going further (but not deeper)
 
-It is also interesting to take a look what is gonna happen from this POV when we'll take different slices further along the generation process. 
-I'll slightly offset the the torch-slice to see that they are absolutely identical at 
-Now after the cross-attention layer (layer 3) we observe the same kind of "non-affine"-like discrepancy.
+It is also interesting to take a look at what is gonna happen from this POV when we'll take different slices further along the generation process. I'll slightly offset the the torch-slice to see that they are absolutely identical at Now, after the cross-attention layer (layer 3), we observe the same kind of "`non-affine`"-like discrepancy.
 
 Now let's take one more step further to finally see that our erroneous answer is not merely a decoding problem.
 
@@ -258,7 +247,7 @@ Now let's take one more step further to finally see that our erroneous answer is
 </a>
 
 # Something is wrong
-Let's make a plot that shows the delta between layers `N` and `N-1`. And then we'll see something peculiar. Specifically we are plotting the change of the hidden state between layers 3 and 2. Layer 3 is the first of the cross-attention blocks and weirdly it does not affect the hidden state. It seems that our control tokens are completely **masked out** for all blocks in cross-attention in `TRT-LLM` implementation. Interestingly it is not the case for the Huggingface implementation.
+Let's make a plot that shows the delta between layers `+N+` and `+N-1+`. And then we'll see something peculiar. Specifically, we plot the change of the hidden state between layers 3 and 2. Layer 3 is the first of the cross-attention blocks, and weirdly, it does not affect the hidden state. It seems that our control tokens are completely **masked out** for all blocks in cross-attention in `+TRT-LLM+` implementation. Interestingly, this is not the case for the Huggingface implementation.
 
 <a href="/images/image5.png" target="_blank">
   <img src="/images/image5.png" alt="Description of image">
@@ -275,16 +264,16 @@ Hereby, we conclude, that incorrect behavior has something to do with:
 1) cross-attention
 2) incorrect masking
 
-Is it enough of to cause incorrect behavior to propagate all the way downstream till the incorrect token? Possibly no, but it's definitely worth further investigation. 
+Is it enough to cause incorrect behavior to propagate downstream until the incorrect token is generated? Possibly not, but it's definitely worth further investigation.
 
 # Conclusion
 What did we learn today: 
 
 * How to do some TensorRT-LLM instrumentation.
-* How to inject models with littering them all over with our probing functions.
-* Easily compare two vectors visually by plotting them and overlaying over each other.
-* We applied these techniques for a problem "in the wild" - some malfunction in a new LLM.
+* How can models be diagnosed by implanting them all over with our probing functions?
+* How to easily compare two vectors hidden states by plotting them and overlaying over each other.
+* How to apply these techniques for a problem "in the wild" - an obscure malfunction in a new LLM.
 
 Keep in mind, that all these are merely an addition to reading the code diligently.
 
-In the next episode we will check if Nvidia patched their implementation and also if would be able to extract attention masks and make some further observations. 
+In the next episode, we will check if Nvidia patched its implementation and also if would be able to extract attention masks and make some further observations.
