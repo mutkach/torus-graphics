@@ -3,7 +3,8 @@ html {
 }
 
 body {
-  font-size: 1.6rem;
+  font-family: "PT Serif";
+  font-size: 1.5rem;
   color: #000;
 }
 
@@ -17,13 +18,13 @@ img {
   margin-right: auto;
 }
 code {
-  font-family: "Source Code Pro", Consolas, Monaco, "Andale Mono", monospace;
+  font-family: "IBM Plex Mono", Consolas, Monaco, "Andale Mono", monospace;
   font-size: 0.85em; /* Makes the font 85% of the parent font size */
 }
 
 /* Target code blocks */
 pre code {
-  font-family: "Source Code Pro", Consolas, Monaco, "Andale Mono", monospace;
+  font-family: "IBM Plex Mono", Consolas, Monaco, "Andale Mono", monospace;
   font-size: 0.85em;
   display: block;
   padding: 1em;

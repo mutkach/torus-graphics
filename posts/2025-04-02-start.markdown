@@ -6,7 +6,7 @@ author: mutkach
 _Problem: You have downloaded and tested a brand new LLM model from HF. You test it - everything works great for a couple of examples. Now you want to deploy it and the end-to-end test result seems to be different or even completely wrong._
 
 I will show you a certain method that I've been using for years for debugging neural networks of different kinds. Specifically it helps a lot while converting models between different formats and runtimes.
-Let's take for example `Llama-3.2-11B-Visual-Instruct`.
+Let's take for example `Llama-3.2-11B-Vision-Instruct`.
 We'll pick TensorRT-LLM as our "production" backend which is expected to serve the requests, while testing is done using good ol' `Huggingface`. It was all good until I reached a problem that virtually broke the of out business case: for some images llama would incorrectly parse some of the parts of the document. Neither vLLM nor `Huggingface` had that problem. 
 
 For confidentiality reasons I'm not showing the precise inputs and images, but it is actually trivial to find some troublesome corner-cases. 
@@ -35,7 +35,7 @@ Today we will examine the troublesome difference of inputs between those of TRT-
 
 # Preparing (or _preparating_) the TRT-LLM
 Llama-11b-Vision consists of 39 transformer blocks. We want to mark the output of each transformer block and save them somewhere. TensorRT and the TRT-LLM specifically - are very optimization intensive it is done by _registering_ the outputs first. Let's do just that. 
-Let's follow this guide: https://nvidia.github.io/TensorRT-LLM/reference/troubleshooting.html#debug-on-e2e-models. 
+Let's follow this [guide](https://nvidia.github.io/TensorRT-LLM/reference/troubleshooting.html#debug-on-e2e-models)
 
 It's important to build the model in debug mode such that it does not optimize out your outputs:
 
@@ -51,7 +51,7 @@ trtllm-build
 
 
 
-I'll cite the manual here:
+I'll cite the [manual](https://nvidia.github.io/TensorRT-LLM/reference/troubleshooting.html#debug-on-e2e-models) here:
 
 ```python
     hidden_states = residual + attention_output.data
@@ -68,7 +68,7 @@ I'll cite the manual here:
     hidden_states = residual + hidden_states
 ```
 
-What we need to do first is find `forward()` in the `MLLaMAModel class` (located in `models/mllama/model.py`) and register the output just after the transformer block - this will get 39 debug outputs -  one for each layer - which we would be able inspect at runtime later:
+What we need to do first is find `forward()` in the `MLLaMAModel class` (located in [`models/mllama/model.py`](https://github.com/NVIDIA/TensorRT-LLM/blob/main/tensorrt_llm/models/mllama/model.py#L684)) and register the output just after the transformer block - this will get us 39 debug outputs -  one for each layer - which we would be able inspect at runtime later:
 
 ```python
 # somewhere in the forward() function
@@ -111,7 +111,7 @@ Signature (input_ids: torch.LongTensor = None, attention_mask: Optional[torch.Te
 ```
 This output is useful when the structure of the module is particularly complex or when looking at source code is not an option for some reason...
 
-So the wrapper of the transformer block looks something like this...:
+So the wrapper of the transformer block looks something like this:
 
 
 
@@ -220,19 +220,19 @@ Which gives us this nice output:
 
 
 
-![image00](../images/image1.png){.small}
+![fig. 1](../images/image1.png){.small}
 
 As you can see both frameworks have the same hidden states for each token.
 Now let's see what happens after the first cross-attention **layer_idx = 3**:
 
-![after crossatt](../images/image2.png){.small}
+![fig. 2](../images/image2.png){.small}
 
 We may now visually observe the differences of hidden states that cannot be attributed to normalization (or de-normalization) and may further indicate that something is going wrong here. Notably it is indeed a case only in regards to the control tokens like `user` and `<end header_id>`.  Let's explore this further to decide whether it is only a minor numerical fluke or an actual bug. 
 For the last layer output (**layer 38**):
 
 
 
-![image3](../images/image3.png){.small}
+![fig. 3](../images/image3.png){.small}
 
 As expected the error propagates further. Also note the `corrcoef` drops to 0.7 which is the possible reason we get differing outputs in the end. 
 
@@ -244,7 +244,7 @@ Now after the cross-attention layer (layer 3) we observe the same kind of "non-a
 
 Now let's take one more step further to see that our different answer is not merely a decoding problem, it eventually culminates in the wrong answer - at the layer 0!
 
-![image_last](../images/image4.png)
+![fig. 4](../images/image4.png)
 
 # Something is weird
 Let's make a plot that shows the delta between layers `N` and `N-1`. And we will see something peculiar. Exactly between layers 3 and 2, where we can observe that complete masking happens. Our control tokens are completely **masked out** for all blocks in cross-attention in `TRT-LLM` implementation. 
@@ -253,7 +253,7 @@ Here's an (possibly not too confusing) image.
 
 
 
-![masked tokens](../images/image5.png)
+![fig. 5](../images/image5.png)
 
 
 
@@ -261,16 +261,17 @@ Here's an (possibly not too confusing) image.
 
 What that means is that there an cross-attention mask incorrectly applied in TRT-LLM
 
-Hereby, we conclude, that incorrect behavior had something to do with 
+Hereby, we conclude, that incorrect behavior had something to do with:
+
 1) cross-attention
 2) incorrect masking
-Is it enough to cause incorrect behavior downstream all the way to the incorrect answer? Possibly no, but it's definitely worth further investigation. And that's the only
+
+Is it enough of to cause incorrect behavior all the way downstream to the incorrect answer? Possibly no, but it's definitely worth further investigation. And that's the only
 
 # Conclusion
 What did we learn today: 
+
 * How to do some TensorRT-LLM instrumentation
-
 * Patched some Torch models littering them all with our probes 
-
 * We applied these techniques for a problem "in the wild" - some malfunction in a new LLM.
   Keep in mind, that all these are merely an addition to reading the code thoroughly
