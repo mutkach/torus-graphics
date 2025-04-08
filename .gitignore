@@ -25,3 +25,5 @@ _site/*
 _cache/*
 dist-newstyle/
 .idea/*
+dist-newstyle/**
+dist-newstyle
