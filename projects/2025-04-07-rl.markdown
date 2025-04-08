@@ -1,0 +1,8 @@
+---
+title: The RL Agent for Survivors-like game.
+author: mutkach
+---
+
+1. Create an OpenAI Gym Environment.
+2. Create a Baseline engine.
+3. ???

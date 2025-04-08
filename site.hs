@@ -40,7 +40,7 @@ main = hakyll $ do
     match "images/*" $ do
         route   idRoute
         compile $ loadImage
-                >>= scaleImageCompiler 1024 800
+                >>= scaleImageCompiler 800 800
 
     create ["css/syntax.css"] $ do
       route idRoute
@@ -61,7 +61,6 @@ main = hakyll $ do
     match "posts/*" $ do
         route $ setExtension "html"
         compile $ do
-         trace "FUCK YOU" $ return ()
          myPandocCompiler'
             >>= loadAndApplyTemplate "templates/post.html"    postCtx
             >>= loadAndApplyTemplate "templates/default.html" postCtx
@@ -70,7 +69,6 @@ main = hakyll $ do
     match "projects/*" $ do
         route $ setExtension "html"
         compile $ do
-         trace "FUCK YOU" $ return ()
          myPandocCompiler'
             >>= loadAndApplyTemplate "templates/project.html"    postCtx
             >>= loadAndApplyTemplate "templates/default.html" postCtx
@@ -79,8 +77,10 @@ main = hakyll $ do
     create ["archive.html"] $ do
         route idRoute
         compile $ do
+            projects <- recentFirst =<< loadAll "projects/*"
             posts <- recentFirst =<< loadAll "posts/*"
             let archiveCtx =
+                    listField "projects" postCtx (return projects) `mappend`
                     listField "posts" postCtx (return posts) `mappend`
                     constField "title" "Archives"            `mappend`
                     defaultContext
@@ -95,11 +95,12 @@ main = hakyll $ do
         route idRoute
         compile $ do
             pure $ trace "fuck you"
+            projects <- recentFirst =<< loadAll "projects/*"
             posts <- recentFirst =<< loadAll "posts/*"
             let indexCtx =
+                    listField "projects" postCtx (return projects) `mappend`
                     listField "posts" postCtx (return posts) `mappend`
                     defaultContext
-
             getResourceBody
                 >>= applyAsTemplate indexCtx
                 >>= loadAndApplyTemplate "templates/default.html" indexCtx

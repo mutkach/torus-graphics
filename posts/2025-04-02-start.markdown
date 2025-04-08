@@ -268,7 +268,9 @@ Is it enough to cause incorrect behavior downstream all the way to the incorrect
 
 # Conclusion
 What did we learn today: 
-  - How to do some TensorRT-LLM instrumentation
-  - Patched some Torch models littering them all with our probes 
-  - We applied these techniques for a problem "in the wild" - some minor malfunction of an LLM
-Keep in mind, that all these are merely an addition to reading the code thoroughly
+* How to do some TensorRT-LLM instrumentation
+
+* Patched some Torch models littering them all with our probes 
+
+* We applied these techniques for a problem "in the wild" - some malfunction in a new LLM.
+  Keep in mind, that all these are merely an addition to reading the code thoroughly
