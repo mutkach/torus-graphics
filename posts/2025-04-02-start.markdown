@@ -12,12 +12,15 @@ We'll pick TensorRT-LLM as our "production" backend which is expected to serve t
 For confidentiality reasons I'm not showing the precise inputs and images, but it is actually trivial to find some troublesome corner-cases. 
 
 Let's say it was a web page snapshot with a VQA-like question about a certain number located on page. Two frameworks gave similar answers notably regarding the answer of question. HF - does, `TRT-LLM` - does not.
+
+![example that cannot be parsed correctly](../images/image20.jpg)
+
 The prompt that was given to it was asking for the correct date of something that happened and was mentioned in the page, and the correct answer should have been, something like 
 
 * **Huggingface**: `"The date shown in the screenshot is 26.11.2024."` 
-* **TRT-LLM:** `The date shown in the screenshot is November 1, 2023.`
+* **TRT-LLM:** `"The date shown in the screenshot is November 1, 2023."`
 
-For the intended use case it's not enough to merely respond with a grammatically and semantically correct way, I need to get the precise answer to my question. Now that we see the differing outputs we would want to investigate the reasons. One of the possibilities here is to first localize the discrepancy. Of course LLM cannot be wrong _everywhere_. For that, I would recommend something called - `comparative surgery`. It is a universal method for all kinds of Neural Networks - not just LLM. In short, it means that we extract meaningful parts of intermediate layers (one - from a healthy specimen and the faulty one), then compare them one to one.
+For the intended use case it's not enough to merely respond with a grammatically and semantically correct way, I need to get the precise answer to my question. Now that we see the differing outputs we would want to investigate the reasons. One of the possibilities here is to first localize the discrepancy. Of course LLM cannot be wrong _everywhere_. For that, I would recommend something called - let's call it - `comparative LLM surgery`. It is a universal method for all kinds of Neural Networks - not just LLMs. In short, it means that we extract meaningful parts of intermediate layers (one - from a healthy specimen and the faulty one), then compare them one to one.
 
 The plan for diagnosing the LLM is as follows: 
 
@@ -220,37 +223,46 @@ Which gives us this nice output:
 
 
 
-![fig. 1](../images/image1.png){.small}
+<a href="/images/image1.png" target="_blank">
+  <img src="/images/image1.png" alt="Description of image">
+</a>
 
 As you can see both frameworks have the same hidden states for each token.
 Now let's see what happens after the first cross-attention **layer_idx = 3**:
 
-![fig. 2](../images/image2.png){.small}
+<a href="/images/image2.png" target="_blank">
+  <img src="/images/image2.png" alt="Description of image">
+</a>
 
-We may now visually observe the differences of hidden states that cannot be attributed to normalization (or de-normalization) and may further indicate that something is going wrong here. Notably it is indeed a case only in regards to the control tokens like `user` and `<end header_id>`.  Let's explore this further to decide whether it is only a minor numerical fluke or an actual bug. 
+We may now visually observe the differences of hidden states that cannot be attributed to just a rescaling or varying precision (and it is not the case, both frameworks use `bfloat16`) and may further indicate that something is going wrong here. Notably it is indeed a case only in regards to the control tokens like `user` and `<end header_id>`.  Let's explore this further to decide whether it is only a minor numerical fluke or an actual bug. 
 For the last layer output (**layer 38**):
 
 
 
-![fig. 3](../images/image3.png){.small}
+<a href="/images/image3.png" target="_blank">
+  <img src="/images/image3.png" alt="Description of image">
+</a>
 
-As expected the error propagates further. Also note the `corrcoef` drops to 0.7 which is the possible reason we get differing outputs in the end. 
+As expected the error propagates further. Also note the `corrcoef` that I use to measure discrepancy between hidden states drops to 0.7 which is the possible reason we get differing outputs in the end. 
 
 # Going further (but not deeper)
 
 It is also interesting to take a look what is gonna happen from this POV when we'll take different slices further along the generation process. 
 I'll slightly offset the the torch-slice to see that they are absolutely identical at 
-Now after the cross-attention layer (layer 3) we observe the same kind of "non-affine"-like discrepancy:!
+Now after the cross-attention layer (layer 3) we observe the same kind of "non-affine"-like discrepancy.
 
-Now let's take one more step further to see that our different answer is not merely a decoding problem, it eventually culminates in the wrong answer - at the layer 0!
+Now let's take one more step further to finally see that our erroneous answer is not merely a decoding problem.
 
-![fig. 4](../images/image4.png)
+<a href="/images/image4.png" target="_blank">
+  <img src="/images/image4.png" alt="Description of image">
+</a>
 
 # Something is wrong
-Let's make a plot that shows the delta between layers `N` and `N-1`. And then we will see something peculiar. Specifically we are plotting the change of the hidden state between layers 3 and 2. Layer 3 is the first of the cross-attention blocks and weirdly it does not affect the hidden state. It seems that our control tokens are completely **masked out** for all blocks in cross-attention in `TRT-LLM` implementation. Interestingly it is not the case for the Huggingface implementation.
+Let's make a plot that shows the delta between layers `N` and `N-1`. And then we'll see something peculiar. Specifically we are plotting the change of the hidden state between layers 3 and 2. Layer 3 is the first of the cross-attention blocks and weirdly it does not affect the hidden state. It seems that our control tokens are completely **masked out** for all blocks in cross-attention in `TRT-LLM` implementation. Interestingly it is not the case for the Huggingface implementation.
 
-
-![fig. 5](../images/image5.png)
+<a href="/images/image5.png" target="_blank">
+  <img src="/images/image5.png" alt="Description of image">
+</a>
 
 
 
@@ -263,7 +275,7 @@ Hereby, we conclude, that incorrect behavior has something to do with:
 1) cross-attention
 2) incorrect masking
 
-Is it enough of to cause incorrect behavior all the way downstream to the incorrect answer? Possibly no, but it's definitely worth further investigation. And that's the only
+Is it enough of to cause incorrect behavior to propagate all the way downstream till the incorrect token? Possibly no, but it's definitely worth further investigation. 
 
 # Conclusion
 What did we learn today: 
@@ -275,4 +287,4 @@ What did we learn today:
 
 Keep in mind, that all these are merely an addition to reading the code diligently.
 
-In the next episode we will check if Nvidia patched their implementation and also it would be nice to extract attention masks and make some further observations.
+In the next episode we will check if Nvidia patched their implementation and also if would be able to extract attention masks and make some further observations. 

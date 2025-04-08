@@ -27,3 +27,4 @@ dist-newstyle/
 .idea/*
 dist-newstyle/**
 dist-newstyle
+**/.DS_Store
